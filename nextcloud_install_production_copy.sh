@@ -132,6 +132,7 @@ the server will be rebooted. After the reboot, please login as usual and run thi
         else
             if dpkg-reconfigure tzdata
             then
+####################### Need TO FIX THIS #############################################
                 # Change timezone in php and logging if the startup script not exists
                 if ! [ -f "$SCRIPTS/nextcloud-startup-script.sh" ]
                 then
@@ -153,7 +154,6 @@ the server will be rebooted. After the reboot, please login as usual and run thi
     *)
     ;;
 esac
-exit
 
 # Is this run as a pure root user?
 if is_root
