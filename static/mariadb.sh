@@ -3,7 +3,7 @@
 # T&M Hansson IT AB © - 2023, https://www.hanssonit.se/
 
 true
-SCRIPT_NAME="Additional Apps Menu"
+SCRIPT_NAME="MariaDB"
 # shellcheck source=lib.sh
 source /var/scripts/fetch_lib.sh
 
