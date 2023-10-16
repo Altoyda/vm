@@ -137,14 +137,21 @@ Please also post this issue on: https://github.com/nextcloud/vm/issues"
     exit 1
 fi
 
-# Check that this run on the PostgreSQL VM
-if ! is_this_installed postgresql-common
+# # Check that this run on the PostgreSQL VM
+# if ! is_this_installed postgresql-common
+# then
+#     print_text_in_color "$IRed" "This script is intended to be \
+# run using a PostgreSQL database, but PostgreSQL is not installed."
+#     print_text_in_color "$IRed" "Aborting..."
+#     exit 1
+# fi
+
+## Check that this run on the MariaDB VM
+if ! is_this_installed mariadb-server
 then
     print_text_in_color "$IRed" "This script is intended to be \
-run using a PostgreSQL database, but PostgreSQL is not installed."
+run using a MariaDB database, but MariaDB is not installed."
     print_text_in_color "$IRed" "Aborting..."
-    exit 1
-fi
 
 # Run the startup menu
 run_script MENU startup_configuration
@@ -275,7 +282,7 @@ msg_box "This script will configure your Nextcloud and activate TLS.
 It will also do the following:
 
 - Generate new SSH keys for the server
-- Generate new PostgreSQL password
+- Generate new Mariadb password
 - Install selected apps and automatically configure them
 - Detect and set hostname
 - Detect and set trusted domains
@@ -333,8 +340,13 @@ printf "\nGenerating new SSH keys for the server...\n"
 rm -v /etc/ssh/ssh_host_*
 dpkg-reconfigure openssh-server
 
-# Generate new PostgreSQL password
-print_text_in_color "$ICyan" "Generating new PostgreSQL password..."
+# # Generate new PostgreSQL password
+# print_text_in_color "$ICyan" "Generating new PostgreSQL password..."
+# check_command bash "$SCRIPTS/change_db_pass.sh"
+# sleep 3
+
+# Generate new MariaDB password
+print_text_in_color "$ICyan" "Generating new MariaDB password..."
 check_command bash "$SCRIPTS/change_db_pass.sh"
 sleep 3
 
@@ -591,11 +603,17 @@ Nextcloud Enterprise gives professional organizations software optimized and tes
 More info here: https://nextcloud.com/enterprise/
 Get your license here: https://shop.hanssonit.se/product/nextcloud-enterprise-license-100-users/"
 
+# msg_box "TIPS & TRICKS:
+# 1. Publish your server online: http://shortio.hanssonit.se/ffOQOXS6Kh
+# 2. To login to PostgreSQL just type: sudo -u postgres psql nextcloud_db
+# 3. To update this server just type: sudo bash /var/scripts/update.sh
+# 4. Install apps, configure Nextcloud, and server: sudo bash $SCRIPTS/menu.sh"
+
 msg_box "TIPS & TRICKS:
 1. Publish your server online: http://shortio.hanssonit.se/ffOQOXS6Kh
-2. To login to PostgreSQL just type: sudo -u postgres psql nextcloud_db
-3. To update this server just type: sudo bash /var/scripts/update.sh
-4. Install apps, configure Nextcloud, and server: sudo bash $SCRIPTS/menu.sh"
+2. To login to Mariadb just type: sudo mysql -u root -p
+To update this server just type: sudo bash /var/scripts/update.sh
+3. Install apps, configure Nextcloud, and server: sudo bash $SCRIPTS/menu.sh"
 
 msg_box "SUPPORT:
 Please ask for help in the forums, visit our shop to buy support:

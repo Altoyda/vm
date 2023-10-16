@@ -284,8 +284,11 @@ Please don't restart or shutdown your server until then!"
     rm -f "$SCRIPTS"/alldatabases.sql "$SCRIPTS"/alldatabases.dump
     if sudo -Hiu postgres psql -c "SELECT 1 AS result FROM pg_database WHERE datname='$NCDB'" | grep -q "1 row"
     then
-        inform_user "$ICyan" "Doing pgdump of $NCDB..."
-        sudo -Hiu postgres pg_dump "$NCDB"  > "$SCRIPTS"/nextclouddb.dump
+        # inform_user "$ICyan" "Doing pgdump of $NCDB..."
+        # sudo -Hiu postgres pg_dump "$NCDB"  > "$SCRIPTS"/nextclouddb.dump
+        # chown root:root "$SCRIPTS"/nextclouddb.dump
+        inform_user "$ICyan" "Doing mysqldump of $NCDB..."
+        mysqldump -u root -pPASSWORD "$NCDB" > "$SCRIPTS"/nextclouddb.dump
         chown root:root "$SCRIPTS"/nextclouddb.dump
         chmod 600 "$SCRIPTS"/nextclouddb.dump
     else

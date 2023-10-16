@@ -352,18 +352,186 @@ $MENU_GUIDE" "$WT_HEIGHT" "$WT_WIDTH" 4 \
     fi
 done
 
-# Install PostgreSQL
+#################### Change PostgresSQL to MariaDB (MySQL) ####################
+
+# # Install PostgreSQL
+# apt-get update -q4 & spinner_loading
+# install_if_not postgresql
+
+# # Create DB
+# cd /tmp
+# sudo -u postgres psql <<END
+# CREATE USER $PGDB_USER WITH PASSWORD '$PGDB_PASS';
+# CREATE DATABASE nextcloud_db WITH OWNER $PGDB_USER TEMPLATE template0 ENCODING 'UTF8';
+# END
+# print_text_in_color "$ICyan" "PostgreSQL password: $PGDB_PASS"
+# systemctl restart postgresql.service
+
+################################ MariaDB ####################################
+
+# Installation of the MariaDB database 10.11
+# add the repository for the latest version of MariaDB
+# Add repository for MariaDB 10.11
+echo "Adding repository for MariaDB 10.11..."
+# Import the MariaDB repository key
+echo "Importing the MariaDB repository key..."
+sudo apt install -y apt-transport-https curl
+sudo mkdir -p /etc/apt/keyrings
+sudo curl -o /etc/apt/keyrings/mariadb-keyring.pgp 'https://mariadb.org/mariadb_release_signing_key.pgp'
+echo "MariaDB repository key imported successfully!"
+# Create a sources list file for MariaDB
+echo "Creating a sources list file for MariaDB..."
+sudo tee /etc/apt/sources.list.d/mariadb.sources << EOL
+# MariaDB 10.11 repository list - created $(date -u +"%Y-%m-%d %H:%M UTC")
+# https://mariadb.org/download/
+X-Repolib-Name: MariaDB
+Types: deb
+# deb.mariadb.org is a dynamic mirror if your preferred mirror goes offline. See https://mariadb.org/mirrorbits/ for details.
+# URIs: https://deb.mariadb.org/10.11/ubuntu
+URIs: https://atl.mirrors.knownhost.com/mariadb/repo/10.11/ubuntu
+Suites: jammy
+Components: main main/debug
+Signed-By: /etc/apt/keyrings/mariadb-keyring.pgp
+EOL
+echo "Sources list file created for MariaDB!"
+
 apt-get update -q4 & spinner_loading
-install_if_not postgresql
+install_if_not mariadb-server
+
+# Create root password in MariaDB safe mode
+# Step 1: Stop MariaDB
+if sudo systemctl is-active --quiet mariadb; then
+    sudo systemctl stop mariadb
+    if [ $? -eq 0 ]; then
+        echo "MariaDB stopped successfully"
+    else
+        echo "Error: Failed to stop MariaDB"
+        exit 1
+    fi
+else
+    echo "MariaDB is already stopped"
+fi
+
+# Step 2: Start MariaDB in Safe Mode
+sudo mysqld_safe --skip-grant-tables --skip-networking &
+if [ $? -eq 0 ]; then
+    echo "MariaDB started in safe mode successfully"
+else
+    echo "Error: Failed to start MariaDB in safe mode"
+    exit 1
+fi
+
+# Step 3: Connect to MariaDB
+mysql -u root <<END
+USE mysql;
+UPDATE user SET password = PASSWORD('$MDBROOT_PASS') WHERE User = 'root';
+FLUSH PRIVILEGES;
+END
+if [ $? -eq 0 ]; then
+    echo "MariaDB root password updated successfully"
+else
+    echo "Error: Failed to update MariaDB root password"
+    exit 1
+fi
+
+# Step 4: Exit MariaDB
+if [ "$?" -eq 0 ]; then
+    exit
+else
+    echo "Error: Failed to exit MariaDB"
+    exit 1
+fi
+
+# Step 5: Stop MariaDB Safe Mode
+sudo pkill -f mysqld_safe
+if [ $? -eq 0 ]; then
+    echo "MariaDB safe mode stopped successfully"
+else
+    echo "Error: Failed to stop MariaDB safe mode"
+    exit 1
+fi
+
+# Step 6: Start MariaDB
+sudo systemctl start mariadb
+if [ $? -eq 0 ]; then
+    echo "MariaDB started successfully"
+else
+    echo "Error: Failed to start MariaDB"
+    exit 1
+fi
 
 # Create DB
-cd /tmp
-sudo -u postgres psql <<END
-CREATE USER $PGDB_USER WITH PASSWORD '$PGDB_PASS';
-CREATE DATABASE nextcloud_db WITH OWNER $PGDB_USER TEMPLATE template0 ENCODING 'UTF8';
+sudo mysql -u root <<END
+CREATE USER '$MDB_USER'@'localhost' IDENTIFIED BY '$MDB_PASS';
+CREATE DATABASE $MDB_NAME CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+GRANT ALL PRIVILEGES ON $MDB_NAME.* TO '$MDB_USER'@'localhost';
+FLUSH PRIVILEGES;
 END
-print_text_in_color "$ICyan" "PostgreSQL password: $PGDB_PASS"
-systemctl restart postgresql.service
+
+# Check if the database exists
+if mysqlshow -u root -p --count $MDB_NAME >/dev/null 2>&1; then
+    echo "Database $MDB_NAME exists"
+else
+    echo "Database $MDB_NAME does not exist"
+fi
+
+print_text_in_color "$ICyan" "MariaDB password for user $MDB_USER in database $MDB_NAME: $MDB_PASS"
+systemctl restart mariadb.service
+
+# Stop MariaDB service
+sudo service mariadb stop
+
+# Create SCRIPTS directory if it doesn't exist
+mkdir -p "$SCRIPTS"
+
+# Download the MariaDB configuration file
+curl -o "$MDB_FILE_LOCAL" "$MDB_FILE_URL"
+
+# Check if the MariaDB configuration file was downloaded successfully
+if [ $? -ne 0 ]; then
+    MESSAGE="ERROR: Failed to download MariaDB configuration file from $MDB_FILE_URL."
+    msg_box "Error" "$MESSAGE"
+    exit 1
+fi
+
+# Define the path to the MariaDB configuration file
+MDB_FILE="$MDB_FILE_LOCAL"
+
+# Check if the MariaDB configuration file exists
+if [ ! -f "$MDB_FILE" ]; then
+    MESSAGE="ERROR: MariaDB configuration file $MDB_FILE not found. Please download it from https://example.com/my.cnf.config."
+    msg_box "Error" "$MESSAGE"
+    sleep 30
+else
+    # Stop MariaDB service
+    sudo service mariadb stop
+
+    # Backup existing my.cnf file
+    sudo mv /etc/mysql/my.cnf /etc/mysql/my.cnf.bak
+
+    # Create a new my.cnf file with the provided configuration
+    sudo tee /etc/mysql/my.cnf >/dev/null <<EOL
+    $(cat "$MDB_FILE")
+EOL
+
+    # Check if there were any errors
+    if [ $? -eq 0 ]; then
+        echo "Configuration added to my.cnf successfully"
+    else
+        MESSAGE="ERROR WITH MariaDB my.cnf import. Please download the configuration file from https://example.com/my.cnf.config and try again."
+        msg_box "Error" "$MESSAGE"
+        sleep 30
+    fi
+fi
+
+########################################## END MariaDB ##########################################
+
+# Check if the user exists
+if mysql -u root -p -e "SELECT EXISTS(SELECT 1 FROM mysql.user WHERE user = '$MDB_USER')" | grep -q '1'; then
+    echo "User $MDB_USER exists"
+else
+    echo "User $MDB_USER does not exist"
+fi
 
 # Install Apache
 check_command install_if_not apache2
@@ -700,17 +868,17 @@ sed -i "s|;emergency_restart_threshold.*|emergency_restart_threshold = 10|g" /et
 sed -i "s|;emergency_restart_interval.*|emergency_restart_interval = 1m|g" /etc/php/"$PHPVER"/fpm/php-fpm.conf
 sed -i "s|;process_control_timeout.*|process_control_timeout = 10|g" /etc/php/"$PHPVER"/fpm/php-fpm.conf
 
-# PostgreSQL values for PHP (https://docs.nextcloud.com/server/latest/admin_manual/configuration_database/linux_database_configuration.html#postgresql-database)
-{
-echo ""
-echo "[PostgresSQL]"
-echo "pgsql.allow_persistent = On"
-echo "pgsql.auto_reset_persistent = Off"
-echo "pgsql.max_persistent = -1"
-echo "pgsql.max_links = -1"
-echo "pgsql.ignore_notice = 0"
-echo "pgsql.log_notice = 0"
-} >> "$PHP_FPM_DIR"/conf.d/20-pdo_pgsql.ini
+# # PostgreSQL values for PHP (https://docs.nextcloud.com/server/latest/admin_manual/configuration_database/linux_database_configuration.html#postgresql-database)
+# {
+# echo ""
+# echo "[PostgresSQL]"
+# echo "pgsql.allow_persistent = On"
+# echo "pgsql.auto_reset_persistent = Off"
+# echo "pgsql.max_persistent = -1"
+# echo "pgsql.max_links = -1"
+# echo "pgsql.ignore_notice = 0"
+# echo "pgsql.log_notice = 0"
+# } >> "$PHP_FPM_DIR"/conf.d/20-pdo_pgsql.ini
 
 # Fix https://github.com/nextcloud/vm/issues/714
 print_text_in_color "$ICyan" "Optimizing Nextcloud..."

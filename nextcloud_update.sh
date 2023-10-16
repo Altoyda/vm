@@ -267,13 +267,13 @@ Holding PHP to avoid upgrading to a newer version without migration..."
     apt-mark hold php* >/dev/null 2>&1
 fi
 
-# Don't allow MySQL/MariaDB
-if [[ $NCDBTYPE = mysql ]]
-then
-    msg_box "MySQL/MariaDB is not supported in this script anymore. Please contact us to get support \
-for upgrading your server: https://shop.hanssonit.se/product/premium-support-per-30-minutes/"
-    exit 0
-fi
+# # Don't allow MySQL/MariaDB
+# if [[ $NCDBTYPE = mysql ]]
+# then
+#     msg_box "MySQL/MariaDB is not supported in this script anymore. Please contact us to get support \
+# for upgrading your server: https://shop.hanssonit.se/product/premium-support-per-30-minutes/"
+#     exit 0
+# fi
 
 # Check if the log DIR actually is a file
 if [ -f /var/log/nextcloud ]
@@ -959,41 +959,61 @@ then
     mkdir -p "$BACKUP"
 fi
 
-# Backup PostgreSQL
-if is_this_installed postgresql-common
+# # Backup PostgreSQL
+# if is_this_installed postgresql-common
+# then
+#     cd /tmp
+#     # Test connection to PostgreSQL
+#     if ! sudo -u postgres psql -w -c "\q"
+#     then
+#         # If it fails, trust the 'postgres' user to be able to perform backup
+#         rsync -a /etc/postgresql/*/main/pg_hba.conf "$BACKUP"/pg_hba.conf_BACKUP
+#         sed -i "s|local   all             postgres                                .*|local   all             postgres                                trust|g" /etc/postgresql/*/main/pg_hba.conf
+#         systemctl restart postgresql.service
+#         if sudo -u postgres psql -c "SELECT 1 AS result FROM pg_database WHERE datname='$NCDB'" | grep "1 row" > /dev/null
+#         then
+#             print_text_in_color "$ICyan" "Doing pgdump of $NCDB..."
+#             check_command sudo -u postgres pg_dump -Fc "$NCDB"  > "$BACKUP"/nextclouddb.dump
+#             # Import:
+#             # sudo -u postgres pg_restore --verbose --clean --no-acl --no-owner -h localhost -U ncadmin -d nextcloud_db "$BACKUP"/nextclouddb.dump
+#         else
+#             print_text_in_color "$ICyan" "Doing pgdump of all databases..."
+#             check_command sudo -u postgres pg_dumpall > "$BACKUP"/alldatabases.dump
+#         fi
+#     else
+#         # If there's no issues, then continue as normal
+#         if sudo -u postgres psql -c "SELECT 1 AS result FROM pg_database WHERE datname='$NCDB'" | grep "1 row" > /dev/null
+#         then
+#             print_text_in_color "$ICyan" "Doing pgdump of $NCDB..."
+#             check_command sudo -u postgres pg_dump -Fc "$NCDB"  > "$BACKUP"/nextclouddb.dump
+#             # Import:
+#             # sudo -u postgres pg_restore --verbose --clean --no-acl --no-owner -h localhost -U ncadmin -d nextcloud_db "$BACKUP"/nextclouddb.dump
+#         else
+#             print_text_in_color "$ICyan" "Doing pgdump of all databases..."
+#             check_command sudo -u postgres pg_dumpall > "$BACKUP"/alldatabases.dump
+#         fi
+#     fi
+# fi
+
+################################################# MariaDB Need TO WORK ON #################################################
+# Backup MySQL/MariaDB
+# Backup MariaDB
+if is_this_installed mariadb-server
 then
     cd /tmp
-    # Test connection to PostgreSQL
-    if ! sudo -u postgres psql -w -c "\q"
+    # Test connection to MariaDB
+    if ! mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "SELECT 1 AS result FROM information_schema.tables WHERE table_schema='$NCDB'" > /dev/null 2>&1
     then
-        # If it fails, trust the 'postgres' user to be able to perform backup
-        rsync -a /etc/postgresql/*/main/pg_hba.conf "$BACKUP"/pg_hba.conf_BACKUP
-        sed -i "s|local   all             postgres                                .*|local   all             postgres                                trust|g" /etc/postgresql/*/main/pg_hba.conf
-        systemctl restart postgresql.service
-        if sudo -u postgres psql -c "SELECT 1 AS result FROM pg_database WHERE datname='$NCDB'" | grep "1 row" > /dev/null
-        then
-            print_text_in_color "$ICyan" "Doing pgdump of $NCDB..."
-            check_command sudo -u postgres pg_dump -Fc "$NCDB"  > "$BACKUP"/nextclouddb.dump
-            # Import:
-            # sudo -u postgres pg_restore --verbose --clean --no-acl --no-owner -h localhost -U ncadmin -d nextcloud_db "$BACKUP"/nextclouddb.dump
-        else
-            print_text_in_color "$ICyan" "Doing pgdump of all databases..."
-            check_command sudo -u postgres pg_dumpall > "$BACKUP"/alldatabases.dump
-        fi
+        print_text_in_color "$ICyan" "Doing mysqldump of $NCDB..."
+        check_command mysqldump -u root -p"$MYSQL_ROOT_PASSWORD" "$NCDB" > "$BACKUP"/nextclouddb.sql
+        # Import:
+        # mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "CREATE DATABASE nextcloud_db;"
+        # mysql -u root -p"$MYSQL_ROOT_PASSWORD" nextcloud_db < "$BACKUP"/nextclouddb.sql
     else
-        # If there's no issues, then continue as normal
-        if sudo -u postgres psql -c "SELECT 1 AS result FROM pg_database WHERE datname='$NCDB'" | grep "1 row" > /dev/null
-        then
-            print_text_in_color "$ICyan" "Doing pgdump of $NCDB..."
-            check_command sudo -u postgres pg_dump -Fc "$NCDB"  > "$BACKUP"/nextclouddb.dump
-            # Import:
-            # sudo -u postgres pg_restore --verbose --clean --no-acl --no-owner -h localhost -U ncadmin -d nextcloud_db "$BACKUP"/nextclouddb.dump
-        else
-            print_text_in_color "$ICyan" "Doing pgdump of all databases..."
-            check_command sudo -u postgres pg_dumpall > "$BACKUP"/alldatabases.dump
-        fi
+        print_text_in_color "$ICyan" "Doing mysqldump of all databases..."
+        check_command mysqldump -u root -p"$MYSQL_ROOT_PASSWORD" --all-databases > "$BACKUP"/alldatabases.sql
     fi
-fi
+############################################### MariaDB Need TO WORK ON #################################################
 
 # Prevent apps from breaking the update due to incompatibility
 # Fixes errors like https://github.com/nextcloud/vm/issues/1834
@@ -1176,15 +1196,24 @@ fi
 # Start Apache2
 start_if_stopped apache2
 
+# # Just double check if the DB is started as well
+# if is_this_installed postgresql-common
+# then
+#     if ! pgrep postgres >/dev/null 2>&1
+#     then
+#         print_text_in_color "$ICyan" "Starting PostgreSQL..."
+#         systemctl start postgresql.service
+#     fi
+# fi
+
 # Just double check if the DB is started as well
-if is_this_installed postgresql-common
+if is_this_installed mariadb-server
 then
-    if ! pgrep postgres >/dev/null 2>&1
+    if ! pgrep mariadb >/dev/null 2>&1
     then
-        print_text_in_color "$ICyan" "Starting PostgreSQL..."
-        systemctl start postgresql.service
+        print_text_in_color "$ICyan" "Starting MariaDB..."
+        systemctl start mariadb.service
     fi
-fi
 
 # If the app isn't installed (maybe because it's incompatible), then at least restore from backup and make sure it's disabled
 BACKUP_APPS="$(find "$BACKUP/apps" -maxdepth 1 -mindepth 1 -type d)"

@@ -28,11 +28,11 @@ Please note, this script might take several hours to run, depening on the size o
 # Run all the needed variables
 ncdb
 
-if [[ $NCDBTYPE = mysql ]]
-then
-    msg_box "We only support PostgreSQL, sorry!"
-    exit
-fi
+# if [[ $NCDBTYPE = mysql ]]
+# then
+#     msg_box "We only support PostgreSQL, sorry!"
+#     exit
+# fi
 
 # Run the script and remove it
 print_text_in_color "$ICyan" "Running the scan and fixing broken files..."

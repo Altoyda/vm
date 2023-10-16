@@ -87,7 +87,7 @@ Confirm by pressing [ENTER]. Cancel by pressing [ESC]."
 MENU_GUIDE="Navigate with the [ARROW] keys and confirm by pressing [ENTER]. Cancel by pressing [ESC]."
 RUN_LATER_GUIDE="You can view this script later by running 'sudo bash $SCRIPTS/menu.sh'."
 # Repo
-GITHUB_REPO="https://raw.githubusercontent.com/nextcloud/vm/master"
+GITHUB_REPO="https://raw.githubusercontent.com/Altoyda/vm/master"
 STATIC="$GITHUB_REPO/static"
 LETS_ENC="$GITHUB_REPO/lets-encrypt"
 APP="$GITHUB_REPO/apps"
@@ -111,11 +111,31 @@ ROOT_PROFILE="/root/.bash_profile"
 # User for Bitwarden
 BITWARDEN_USER=bitwarden
 BITWARDEN_HOME=/home/"$BITWARDEN_USER"
+#################### Postgres ####################
+# # Database
+# SHUF=$(shuf -i 25-29 -n 1)
+# PGDB_USER=nextcloud_db_user
+# PGDB_PASS=$(gen_passwd "$SHUF" "a-zA-Z0-9@#*")
+# NEWPGPASS=$(gen_passwd "$SHUF" "a-zA-Z0-9@#*")
+#################### MariaDB ####################
 # Database
 SHUF=$(shuf -i 25-29 -n 1)
-PGDB_USER=nextcloud_db_user
-PGDB_PASS=$(gen_passwd "$SHUF" "a-zA-Z0-9@#*")
-NEWPGPASS=$(gen_passwd "$SHUF" "a-zA-Z0-9@#*")
+MDB_USER=nextcloud_db_user
+MDB_NAME=nextcloud_db
+MDB_PASS=$(gen_passwd "$SHUF" "a-zA-Z0-9@#*")
+echo "MDB_PASS=$MDB_PASS" > $MDB_FILE
+NEWMDBPASS=$(gen_passwd "$SHUF" "a-zA-Z0-9@#*")
+echo "NEWMDBPASS=$NEWMDBPASS" >> $MDB_FILE
+MDBROOT_PASS=$(gen_passwd "$SHUF" "a-zA-Z0-9@#*")
+echo "MDBROOT_PASS=$MDBROOT_PASS" >> $MDB_FILE
+MDB_FILE=/root/passwd.config
+
+# MariaDB my.cnf
+SCRIPTS="/var/scripts"
+GITHUB_REPO="https://raw.githubusercontent.com/Altoyda/vm/master" 
+MDB_FILE_URL="$GITHUB_REPO/my.cnf.config"
+MDB_FILE_LOCAL="$SCRIPTS/my.cnf.config"
+################ END MariaDB ####################
 ncdb() {
     NCDB=$(grep "dbname" $NCPATH/config/config.php | awk '{print $3}' | sed "s/[',]//g")
     NCDBPASS=$(grep "dbpassword" $NCPATH/config/config.php | awk '{print $3}' | sed "s/[',]//g")
